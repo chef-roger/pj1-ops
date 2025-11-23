@@ -32,13 +32,16 @@ pipeline {
 
         // Stage 3: Push Image to Docker Hub (or other registry)
         stage('Push Image') {
-            steps {
-                // This wrapper handles logging in to Docker Hub using the stored Jenkins credentials (PAT)
-                docker.withRegistry("https://registry.hub.docker.com", DOCKER_CREDENTIALS_ID) {
-                    sh "docker push ${DOCKER_REGISTRY}:${IMAGE_TAG}"
-                }
+    steps {
+        // WRAP THE DOCKER METHOD CALLS IN A 'script' BLOCK
+        script {
+            // This wrapper handles logging in to Docker Hub using the stored Jenkins credentials (PAT)
+            docker.withRegistry("https://registry.hub.docker.com", DOCKER_CREDENTIALS_ID) {
+                sh "docker push ${DOCKER_REGISTRY}:${IMAGE_TAG}"
             }
         }
+    }
+}
 
         // Stage 4: Deploy the New Image (Stopping old and starting new)
         stage('Deploy Containers') {
