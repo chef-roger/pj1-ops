@@ -1,0 +1,49 @@
+# .gitignore
+
+# ----------------------------------------------------------------------
+# 1. Python Specific Files
+# ----------------------------------------------------------------------
+
+# Virtual Environment (CRITICAL - never commit your local environment)
+venv/
+
+# Byte-code and Cache files
+__pycache__/
+*.pyc
+
+# Distribution and packaging
+*.egg-info/
+build/
+dist/
+
+# ----------------------------------------------------------------------
+# 2. Local Secrets and Configuration (CRITICAL - for security)
+# ----------------------------------------------------------------------
+
+# The file containing your database password and user details
+.env
+
+# ----------------------------------------------------------------------
+# 3. Operating System / IDE Files
+# ----------------------------------------------------------------------
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+
+# VS Code files (User-specific settings)
+.vscode/
+
+# ----------------------------------------------------------------------
+# 4. Docker Files
+# ----------------------------------------------------------------------
+
+# Local container logs and temporary files
+*.log
+tmp/
+
+# Docker volume data (where your local MySQL files are stored)
+db_data/
