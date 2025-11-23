@@ -1,82 +1,165 @@
-# app.py
-
 import os
-from flask import Flask, render_template_string
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO, emit
-import eventlet
+from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
+from werkzeug.security import generate_password_hash, check_password_hash
+import eventlet # Required by Flask-SocketIO
 
-# --- CONFIGURATION ---
-
-# Read DB connection details from environment variables (set by Docker Compose)
-DB_USER = os.environ.get('DATABASE_USER', 'placeholder_user')
-DB_PASS = os.environ.get('DATABASE_PASSWORD', 'placeholder_pass')
-DB_HOST = os.environ.get('DATABASE_HOST', 'db') 
-DB_NAME = os.environ.get('MYSQL_DATABASE', 'chat_db') 
+# --- Configuration ---
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}/{DB_NAME}'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_secret_key_change_me')
+
+# Get database connection details from environment variables
+DB_USER = os.getenv("DATABASE_USER", "root")
+DB_PASSWORD = os.getenv("DATABASE_PASSWORD", "password")
+DB_HOST = os.getenv("DATABASE_HOST", "db")
+DB_NAME = os.getenv("MYSQL_DATABASE", "chat_db")
+
+# Construct the database URI
+app.config["SQLALCHEMY_DATABASE_URI"] = (
+    f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
 db = SQLAlchemy(app)
+socketio = SocketIO(app, async_mode='eventlet')
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
 
-# Initialize SocketIO for real-time communication
-socketio = SocketIO(app, async_mode='eventlet', manage_session=False, cors_allowed_origins="*")
+# --- Models ---
 
-# --- DATABASE MODEL ---
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    messages = db.relationship('Message', backref='author', lazy='dynamic')
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 class Message(db.Model):
+    __tablename__ = 'messages'
     id = db.Column(db.Integer, primary_key=True)
-    text = db.Column(db.String(500), nullable=False)
+    content = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=db.func.now())
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
-# --- ROUTES & SOCKETIO HANDLERS ---
+# --- Flask-Login User Loader ---
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+# --- Routes ---
+
+@app.before_request
+def create_tables():
+    # Attempt to create tables on first request if they don't exist
+    try:
+        db.create_all()
+    except Exception as e:
+        # Print error but allow request to continue (if connection established)
+        print(f"Error creating tables (DB might be initializing): {e}")
 
 @app.route('/')
+@login_required
 def index():
-    # Load past messages from the database
-    messages = Message.query.order_by(Message.timestamp.asc()).all()
-    # Simple HTML/JS template for the chat interface
-    return render_template_string("""
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
-        <h1>Real-Time Chat App</h1>
-        <div id="messages">
-            {% for msg in messages %}
-                <p>{{ msg.text }}</p>
-            {% endfor %}
-        </div>
-        <input id="chat-input" type="text" placeholder="Type message...">
-        <button onclick="sendMessage()">Send</button>
-        <script>
-            var socket = io();
-            document.getElementById('chat-input').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') { sendMessage(); }
-            });
-            function sendMessage() {
-                var input = document.getElementById('chat-input');
-                socket.emit('message', input.value);
-                input.value = '';
-            }
-            socket.on('response', function(msg) {
-                document.getElementById('messages').innerHTML += '<p><strong>New:</strong> ' + msg + '</p>';
-                window.scrollTo(0, document.body.scrollHeight);
-            });
-        </script>
-    """, messages=messages)
+    # Load last 50 messages
+    messages = Message.query.order_by(Message.timestamp.desc()).limit(50).all()
+    # Reverse to show newest at the bottom
+    messages.reverse()
+    return render_template('index.html', messages=messages, current_user=current_user)
 
-@socketio.on('message')
-def handle_message(data):
-    # Save message to MySQL
-    new_message = Message(text=data)
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            login_user(user)
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid username or password', 'error')
+    
+    return render_template('index.html', page='login')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+        
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        if User.query.filter_by(username=username).first():
+            flash('Username already exists', 'error')
+            return redirect(url_for('register'))
+
+        if len(password) < 6:
+            flash('Password must be at least 6 characters long', 'error')
+            return redirect(url_for('register'))
+            
+        new_user = User(username=username)
+        new_user.set_password(password)
+        db.session.add(new_user)
+        db.session.commit()
+        
+        login_user(new_user)
+        return redirect(url_for('index'))
+        
+    return render_template('index.html', page='register')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('login'))
+
+# --- SocketIO Handlers ---
+
+@socketio.on('connect')
+def handle_connect():
+    if not current_user.is_authenticated:
+        # Disconnect unauthenticated users immediately
+        return False 
+    print(f'Client connected: {current_user.username}')
+
+@socketio.on('send_message')
+@login_required
+def handle_send_message(data):
+    message_content = data['message'].strip()
+    if not message_content:
+        return
+
+    # 1. Save to database
+    new_message = Message(content=message_content, user_id=current_user.id)
     db.session.add(new_message)
     db.session.commit()
-    
-    # Broadcast the message to all connected clients
-    emit('response', data, broadcast=True)
 
-# --- APPLICATION RUNNER ---
+    # 2. Broadcast the message to all connected clients
+    message_package = {
+        'username': current_user.username,
+        'content': message_content,
+        'is_self': False # This will be fixed on the client-side 
+    }
+    # Emit to everyone including the sender
+    emit('new_message', message_package, broadcast=True)
 
+# --- Run App ---
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    # Use socketio.run for the eventlet server
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
+    # Use eventlet to serve the application for real-time capabilities
+    socketio.run(app, host='0.0.0.0', port=5000)
