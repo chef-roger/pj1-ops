@@ -1,14 +1,15 @@
 // Jenkinsfile - Pipeline for the Real-Time Chat App
 
 pipeline {
-    // FINAL FIX: Use the most basic agent type that is guaranteed to work
+    // Uses the simplest agent type for maximum compatibility
     agent any
 
     environment {
         // Define common variables for the project
         IMAGE_NAME = 'chat-app'
         DOCKER_REGISTRY = 'steziwara/chat-app'
-        DOCKER_CREDENTIALS_ID = 'dockerhub-credentials'
+        // Credential ID must match what is set in Jenkins (ID: dockerhub-credentials)
+        DOCKER_CREDENTIALS_ID = 'dockerhub-credentials' 
     }
 
     stages {
@@ -34,8 +35,8 @@ pipeline {
         // Stage 3: Push Image to Docker Hub (or other registry)
         stage('Push Image') {
             steps {
-                // FINAL FIX: Use the highly reliable shell login method 
-                // to bypass the unreliable docker.withRegistry method.
+                // FINAL FIX: This block securely pulls credentials and performs a reliable
+                // shell-based Docker login/push/logout sequence.
                 withCredentials([usernamePassword(credentialsId: DOCKER_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh "docker login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io"
                     sh "docker push ${DOCKER_REGISTRY}:${IMAGE_TAG}"
