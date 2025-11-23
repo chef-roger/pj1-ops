@@ -1,25 +1,22 @@
-# Dockerfile
-
-# Use a lean, official Python image
+# Stage 1: Use a lightweight Python base image
 FROM python:3.10-slim
 
-# Set environment variable for container logging
-ENV PYTHONUNBUFFERED 1
-
-# Set the working directory
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy requirements file first for efficient caching
+# Copy the requirements file (which now includes flask-socketio)
 COPY requirements.txt .
 
-# Install dependencies
+# Install dependencies (This is the step that will now install the missing package)
+# This is a critical step for the "Build Image" stage in Jenkins.
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
+# Copy all application files (app.py, etc.) into the container
 COPY . .
 
-# Expose the internal port for the application
+# Expose the port the Flask app runs on (informational)
 EXPOSE 5000
 
-# Command to run the SocketIO server application
-CMD ["/usr/local/bin/python", "app.py"]
+# Set the command to run the application when the container starts
+# CMD is the final instruction and ensures the Python app runs correctly.
+CMD ["python", "-u", "app.py"]
