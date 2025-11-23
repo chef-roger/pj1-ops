@@ -13,7 +13,7 @@ pipeline {
         // Stage 1: Checkout (Pull) the code from GitHub
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/yourusername/pj1.git' // REPLACE with your GitHub repo URL
+                git branch: 'main', url: 'https://github.com/chef-roger/pj1-ops.git' // REPLACE with your GitHub repo URL
             }
         }
 
