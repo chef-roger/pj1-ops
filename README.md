@@ -15,8 +15,8 @@ This project demonstrates a complete DevOps pipeline for a two-tier, real-time w
 
 1.  **Clone the Repository:**
     ```bash
-    git clone [https://github.com/yourusername/pj1.git](https://github.com/yourusername/pj1.git)
-    cd pj1
+    git clone [https://github.com/chef-roger/pj1-ops.git](https://github.com/chef-roger/pj1-ops.git)
+    cd pj1-ops
     ```
 2.  **Start Services:** Ensure Docker Desktop is running.
     ```bash
