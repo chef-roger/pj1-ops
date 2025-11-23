@@ -1,17 +1,8 @@
 // Jenkinsfile - Pipeline for the Real-Time Chat App
 
 pipeline {
-    // FIX: Correct Declarative Pipeline syntax for the Docker agent
-    agent {
-        // Use 'label' to tell Jenkins where to run (on the main node, which has Docker)
-        label 'master' 
-        // Then, specify the Docker container to run the build inside of
-        docker {
-            image 'python:3.10-slim'
-            // Mount the host's Docker socket to allow this container to run Docker commands
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
-        }
-    }
+    // FINAL FIX: Use the most basic agent type that is guaranteed to work
+    agent any
 
     environment {
         // Define common variables for the project
@@ -19,8 +10,6 @@ pipeline {
         DOCKER_REGISTRY = 'steziwara/chat-app'
         DOCKER_CREDENTIALS_ID = 'dockerhub-credentials'
     }
-
-    // NOTE: The 'tools' block is unnecessary and has been removed, resolving the second error.
 
     stages {
         // Stage 1: Checkout (Pull) the code from GitHub
@@ -45,11 +34,12 @@ pipeline {
         // Stage 3: Push Image to Docker Hub (or other registry)
         stage('Push Image') {
             steps {
-                script {
-                    // This wrapper handles logging in to Docker Hub using the stored Jenkins credentials (PAT)
-                    docker.withRegistry("https://registry.hub.docker.com", DOCKER_CREDENTIALS_ID) {
-                        sh "docker push ${DOCKER_REGISTRY}:${IMAGE_TAG}"
-                    }
+                // FINAL FIX: Use the highly reliable shell login method 
+                // to bypass the unreliable docker.withRegistry method.
+                withCredentials([usernamePassword(credentialsId: DOCKER_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh "docker login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io"
+                    sh "docker push ${DOCKER_REGISTRY}:${IMAGE_TAG}"
+                    sh "docker logout"
                 }
             }
         }
