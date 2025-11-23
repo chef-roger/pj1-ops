@@ -1,58 +1,59 @@
 // Jenkinsfile - Pipeline for the Real-Time Chat App
 
 pipeline {
-    // Uses the simplest agent type for maximum compatibility
     agent any
 
     environment {
-        // Define common variables for the project
+        // Docker Hub variables remain here
         IMAGE_NAME = 'chat-app'
         DOCKER_REGISTRY = 'steziwara/chat-app'
-        // Credential ID must match what is set in Jenkins (ID: dockerhub-credentials)
         DOCKER_CREDENTIALS_ID = 'dockerhub-credentials' 
     }
 
     stages {
-        // Stage 1: Checkout (Pull) the code from GitHub
+        // Stages 1, 2, and 3 remain correctly executed
         stage('Checkout Code') {
-            steps {
-                git branch: 'main', url: 'https://github.com/chef-roger/pj1-ops.git'
-            }
+            steps { git branch: 'main', url: 'https://github.com/chef-roger/pj1-ops.git' }
         }
 
-        // Stage 2: Build the Docker Image
         stage('Build Image') {
             steps {
-                // Build the image and tag it with the Jenkins Build Number
                 script {
                     def customTag = "build-${env.BUILD_NUMBER}"
                     sh "docker build -t ${DOCKER_REGISTRY}:${customTag} ."
-                    env.IMAGE_TAG = customTag // Store the tag for the next stage
+                    env.IMAGE_TAG = customTag
                 }
             }
         }
 
-        // Stage 3: Push Image to Docker Hub (or other registry)
         stage('Push Image') {
             steps {
-                // FINAL FIX: This block securely pulls credentials and performs a reliable
-                // shell-based Docker login/push/logout sequence.
                 withCredentials([usernamePassword(credentialsId: DOCKER_CREDENTIALS_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh "docker login -u ${DOCKER_USER} -p ${DOCKER_PASS} docker.io"
+                    // Ultra-Safe Docker Login via Stdin
+                    sh "echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin docker.io"
                     sh "docker push ${DOCKER_REGISTRY}:${IMAGE_TAG}"
                     sh "docker logout"
                 }
             }
         }
 
-        // Stage 4: Deploy the New Image (Stopping old and starting new)
+        // Stage 4: Secure Deployment Containers
         stage('Deploy Containers') {
             steps {
-                // Stops and removes the old running containers gracefully
-                sh 'docker compose down'
+                // Securely inject DB secrets into the shell environment for Docker Compose
+                withCredentials([
+                    string(credentialsId: 'db-root-password', variable: 'DB_ROOT_PASSWORD'),
+                    string(credentialsId: 'db-user', variable: 'DB_USER')
+                    // Note: DB_ROOT_PASSWORD is reused for DATABASE_PASSWORD in the web service,
+                    // so we only need to load it once.
+                ]) {
+                    // Stops and removes the old running containers gracefully
+                    sh 'docker compose down'
 
-                // Starts the new containers, pulling the new image tag if available
-                sh 'docker compose up -d'
+                    // Starts the new containers. Docker Compose automatically reads
+                    // the DB variables (DB_ROOT_PASSWORD, DB_USER) from the shell environment.
+                    sh 'docker compose up -d'
+                }
             }
         }
     }
