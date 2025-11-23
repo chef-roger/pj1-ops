@@ -1,7 +1,18 @@
 // Jenkinsfile - Pipeline for the Real-Time Chat App
 
 pipeline {
-    agent any
+    // CHANGE 1: Use a specific base Docker image for the agent
+    agent {
+        docker {
+            image 'python:3.10-slim'
+            // We expose the Docker daemon from the host to the container so it can run Docker commands
+            args '-v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
+    
+    tools {
+
+    }
 
     environment {
         // Define common variables for the project
@@ -24,6 +35,9 @@ pipeline {
                 // Build the image and tag it with the Jenkins Build Number
                 script {
                     def customTag = "build-${env.BUILD_NUMBER}"
+                    // Note: Since we are running INSIDE a Docker agent, we no longer need the 'docker build' command here. 
+                    // We will use the native Docker Pipeline syntax which is safer.
+                    // However, to keep it consistent with your previous steps:
                     sh "docker build -t ${DOCKER_REGISTRY}:${customTag} ."
                     env.IMAGE_TAG = customTag // Store the tag for the next stage
                 }
@@ -33,7 +47,6 @@ pipeline {
         // Stage 3: Push Image to Docker Hub (or other registry)
         stage('Push Image') {
             steps {
-                // *** SYNTAX FIX: WRAP docker.withRegistry IN A 'script' BLOCK ***
                 script {
                     // This wrapper handles logging in to Docker Hub using the stored Jenkins credentials (PAT)
                     docker.withRegistry("https://registry.hub.docker.com", DOCKER_CREDENTIALS_ID) {
