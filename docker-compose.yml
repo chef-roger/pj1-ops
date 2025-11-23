@@ -4,7 +4,12 @@ services:
   # 1. The Database Service
   db:
     image: mysql:8.0
-    # REMOVED: env_file: - .env
+    healthcheck: # <-- NEW BLOCK: Add this to the 'db' service
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+      start_period: 10s
+      
     hostname: db
     restart: always
     environment:
@@ -25,11 +30,12 @@ services:
       - "5000:5000"
     # Ensures the database is up before starting the web app
     depends_on:
-      - db
+      db: 
+        condition: service_healthy
     environment:
       # These variables are read by app.py to establish the connection
       DATABASE_HOST: db
-      DATABASE_USER: ${DB_USER}
+      DATABASE_USER: root
       DATABASE_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: chat_db
     volumes:
