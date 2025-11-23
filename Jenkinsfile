@@ -31,11 +31,16 @@ pipeline {
 
         // Stage 3: Push Image to Docker Hub (or other registry)
         stage('Push Image') {
-            steps {
-                // Requires Jenkins credentials to be set up for Docker Hub
-                sh "docker push ${DOCKER_REGISTRY}:${IMAGE_TAG}"
-            }
-        }
+            steps {
+                // Use the withCredentials block to load the ID and then inject it into the push context
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    // The docker.withRegistry block handles the login/logout for the Docker push
+                    docker.withRegistry("https://registry.hub.docker.com", 'dockerhub-credentials') {
+                        sh "docker push ${DOCKER_REGISTRY}:${IMAGE_TAG}"
+                    }
+                }
+            }
+        }
 
         // Stage 4: Deploy the New Image (Stopping old and starting new)
         stage('Deploy Containers') {
