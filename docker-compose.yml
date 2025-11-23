@@ -1,28 +1,24 @@
-# docker-compose.yml
-
 version: '3.8'
 
 services:
   # 1. The Database Service
   db:
     image: mysql:8.0
-    env_file:
-      - .env
+    # REMOVED: env_file: - .env
     hostname: db
     restart: always
     environment:
       # These variables create the database and set the root password
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD} 
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: chat_db
     volumes:
       # Ensures database data persists between restarts
       - db_data:/var/lib/mysql
-  
+
   # 2. The Flask Application Service
   web:
     # Builds the image using the local Dockerfile
-    env_file:
-      - .env
+    # REMOVED: env_file: - .env
     build: .
     ports:
       # Maps local port 5000 to the container's port 5000
