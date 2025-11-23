@@ -6,7 +6,7 @@ pipeline {
     environment {
         // Define common variables for the project
         IMAGE_NAME = 'chat-app' 
-        DOCKER_REGISTRY = 'yourusername/chat-app' // REPLACE with your Docker Hub username!
+        DOCKER_REGISTRY = 'steziwara/chat-app' // REPLACE with your Docker Hub username!
     }
 
     stages {
