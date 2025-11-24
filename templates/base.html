@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Chat App{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", sans-serif; }
+    </style>
+
+    {% block head_extra %}{% endblock %}
+</head>
+<body class="min-h-screen bg-gray-100 flex flex-col">
+
+<header class="bg-indigo-600 text-white py-3 shadow-md">
+    <div class="container mx-auto flex justify-between items-center px-4">
+        <a href="{{ url_for('chat') if current_user.is_authenticated else url_for('login') }}"
+           class="text-xl font-semibold">
+            Real-Time Chat
+        </a>
+
+        <nav class="space-x-4 flex items-center text-sm">
+            {% if current_user.is_authenticated %}
+                <span class="font-medium">
+                    Logged in as {{ current_user.username or current_user.email }}
+                </span>
+                <a href="{{ url_for('logout') }}"
+                   class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded-full">
+                    Logout
+                </a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="hover:text-indigo-200">Login</a>
+                <a href="{{ url_for('register') }}"
+                   class="bg-white text-indigo-600 px-3 py-1 rounded-full font-medium hover:bg-indigo-100">
+                    Register
+                </a>
+            {% endif %}
+        </nav>
+    </div>
+</header>
+
+<main class="flex-grow container mx-auto px-4 py-6">
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="mb-4 space-y-2">
+                {% for category, message in messages %}
+                    <div class="px-4 py-2 rounded text-sm
+                        {% if category == 'error' %}
+                            bg-red-100 text-red-700
+                        {% elif category == 'info' %}
+                            bg-blue-100 text-blue-700
+                        {% else %}
+                            bg-green-100 text-green-700
+                        {% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="bg-gray-200 text-center text-xs text-gray-600 py-2">
+    Simple demo chat app with Flask, Socket.IO & Google OAuth
+</footer>
+
+{% block body_extra %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Chat - Chat App{% endblock %}
+
+{% block head_extra %}
+    <!-- Socket.IO client -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow-lg flex flex-col h-[75vh]">
+    <!-- Header inside chat box -->
+    <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-800">Global Chat Room</h2>
+            <p class="text-xs text-gray-500">
+                Everyone online shares this same room.
+            </p>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    <div id="messages"
+         class="flex-grow overflow-y-auto p-4 space-y-3 bg-gray-50">
+        {% for message in messages %}
+            {% set is_self = (message.author.id == current_user.id) %}
+            <div class="flex {{ 'justify-end' if is_self else 'justify-start' }}">
+                <div class="max-w-xs lg:max-w-md px-3 py-2 rounded-xl text-sm shadow
+                            {{ 'bg-indigo-100 text-gray-900' if is_self else 'bg-gray-200 text-gray-900' }}">
+                    <div class="text-xs font-semibold
+                                {{ 'text-indigo-700' if is_self else 'text-gray-600' }}">
+                        {{ message.author.username or message.author.email }}
+                    </div>
+                    <div>{{ message.content }}</div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Input -->
+    <form id="send-form" class="p-4 border-t border-gray-200 flex space-x-2">
+        <input type="text" id="message-input" autocomplete="off"
+               placeholder="Type a message..."
+               class="flex-grow border border-gray-300 rounded-lg px-3 py-2 focus:ring-indigo-500 focus:border-indigo-500">
+        <button type="submit"
+                class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-700">
+            Send
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+    const socket = io();
+
+    const messagesDiv = document.getElementById('messages');
+    const sendForm = document.getElementById('send-form');
+    const messageInput = document.getElementById('message-input');
+
+    function scrollToBottom() {
+        if (messagesDiv) {
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    }
+
+    window.onload = scrollToBottom;
+
+    function addMessage(username, content, isSelf) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'flex ' + (isSelf ? 'justify-end' : 'justify-start');
+
+        const bubble = document.createElement('div');
+        bubble.className =
+            'max-w-xs lg:max-w-md px-3 py-2 rounded-xl text-sm shadow ' +
+            (isSelf ? 'bg-indigo-100 text-gray-900' : 'bg-gray-200 text-gray-900');
+
+        const uname = document.createElement('div');
+        uname.className =
+            'text-xs font-semibold ' +
+            (isSelf ? 'text-indigo-700' : 'text-gray-600');
+        uname.textContent = username;
+
+        const body = document.createElement('div');
+        body.textContent = content;
+
+        bubble.appendChild(uname);
+        bubble.appendChild(body);
+        wrapper.appendChild(bubble);
+        messagesDiv.appendChild(wrapper);
+
+        scrollToBottom();
+    }
+
+    // Get current user from a safe Jinja injection:
+    const CURRENT_USER = "{{ (current_user.username or current_user.email)|e }}";
+
+    socket.on('new_message', function (data) {
+        const isSelf = data.username === CURRENT_USER;
+        addMessage(data.username, data.content, isSelf);
+    });
+
+    if (sendForm) {
+        sendForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const text = messageInput.value.trim();
+            if (!text) return;
+            socket.emit('send_message', {message: text});
+            messageInput.value = '';
+        });
+    }
+</script>
+{% endblock %}
